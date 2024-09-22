@@ -34,6 +34,35 @@ kube-apiserver-arg:
   - 'basic-auth-file=path/to/the/file/user-details.csv'
 ```
 
+```yaml 
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: # "" indicates the core API group
+  resources: ["pods
+  verbs: ["get", "watch", "lis
+
+---
+# This role binding allows "jane" to read pods in the "default" namespace.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: read-pods
+  namespace: default5
+subjects:
+- kind: User
+  name: user1 # Name is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role #this must be Role or ClusterRole
+  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+```
+
 Static Token file
 ```bash 
 # Create a csv file called user-detail.csv
@@ -58,17 +87,100 @@ sudo systemctl restart k3s.service
 curl -v -k https://master-node-ip:6443/api/v1/pods -u "user1:password123"
 ```
 
+Service Accounts
+```bash
+# This is the way to decode tokens
+jq -R 'split(".") | select(length > 0) | .[0],.[1] | @base64 | fromjson' <<< <token>
+```
+### Authorization
+Node: will be authenticated by the kube-server if the component belongs to the group and ns of the kuberntes cluster
+
+ABAC: Uses a json file that is evaluated to see if the user or a group contains the permission to access a resource
+
+Cons: Dificult to manage, since you need to update files when a new policy is to be included
+```json 
+{"kind": "Policy", "spec": {"user": "dev-user", "namespace": "*", "resource": "pods", "apiGroup": "*"}}
+```
+
+RBAC: 
+
+developer-role.yaml
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list", "get", "create", "update", "delete"]
+
+- apiGroups: [""]
+  resources: ["ConfigMap"]
+  verbs: ["create"]
+```
+Create a role binding object that is used to link a user to the role
+
+devuser-developer-binding.yaml
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devuser-developer-binding
+subjects:
+- kind: User
+  name: dev-user
+  apiGroup: rbac.authorization.K8s.io
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+
+```
+Create the resources and inspect
+```bash 
+kubectl create -f developer-role.yaml
+
+kubectl create -f devuser-developer-rolebinding.yaml
+
+
+get roles
+get rolebinding
+
+
+# what if you want to know if you have access to a certain verbs(actions)
+
+kubectl auth can-i create deployments
+
+kubectl auth can-i delete pods/nodes
+
+# or you can do it by inpersionating the user created 
+
+kubectl auth can-i create deployments --as user-dev
+kubeclt auth can-i create pods --as dev-user
+
+# or check if it has in a namespace
+kubectl auth can-i create deployments --as user-dev --namespace blue
+```
+
 # System Hardening
-
-## Least Privilege principle
-## Limit Node Access
-
-## SSH hardening
-## REstrict kernel modules
-## Identify and disable open ports
+Just a talk with peers
 
 ## Linux Syscalls
+### Tracing syscalls
+
+```bash 
+# see if it is installed 
+which strace
+strace touch /tmp/error.log
+
+# summary of all syscalls used by touch command
+strace -c touch /tmp/error.log
+
+```
 ## Aquasec Tracee
+used to trace system calls at runtime that uses eBPF (extendend Packet Filter)
 ## Restric syscalls using seccomp
 ## AppArmor
 ## Linux Capabilities
@@ -79,6 +191,7 @@ curl -v -k https://master-node-ip:6443/api/v1/pods -u "user1:password123"
 ## Admission Controllers
 
 ```bash
+kubectl api-versions | grep admissionregistration.k8s.io
 # Namespace autorpovision will be loaded in order for this to work
 #this should return an error at first
 kubectl run nginx --image nginx -n blue
