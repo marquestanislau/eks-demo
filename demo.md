@@ -14,6 +14,33 @@ kubectl logs kube-bench-pod-name
 
 Make a quick fix and run again just for a quick demo
 
+### Authentication
+#### Basic authentication mechanism
+Static password file
+
+```bash 
+# Create a csv file called user-detail.csv
+# password,username,userid
+password123,user1,u0001
+password123,user2,u0002
+password123,user3,u0003
+password123,user4,u0004
+password123,user5,u0005
+```
+
+Static token file
+```yaml 
+kube-apiserver-arg:
+  - 'basic-auth-file=path/to/the/file/user-details.csv'
+```
+
+```bash
+# Restart kubernetes
+
+sudo systemctl daemon-reload
+sudo systemctl restart k3s.service
+```
+
 # System Hardening
 
 ## Least Privilege principle
@@ -33,6 +60,30 @@ Make a quick fix and run again just for a quick demo
 ## Security Context
 
 ## Admission Controllers
+
+```bash
+# Namespace autorpovision will be loaded in order for this to work
+#this should return an error at first
+kubectl run nginx --image nginx -n blue
+
+#Open config file
+vim /etc/rancher/k3s/config.yaml
+```
+The configuration file:
+
+```yaml 
+kube-apiserver-arg:
+  - 'enable-admission-plugins=NodeRestriction,NamespaceAutoProvision'
+```
+
+restart the k3s services
+
+```bash
+# Restart kubernetes
+
+sudo systemctl daemon-reload
+sudo systemctl restart k3s.service
+```
 
 
 ## Pode Security Policies
@@ -177,5 +228,14 @@ I will need to reload the kubernetes
 
 sudo systemctl daemon-reload
 sudo systemctl restart k3s.service
+
+# testing if it will work
+# create a ns called prod
+# create a secret and then delete it
+kubectl create secret generic mysecret --from-literal=password=superpassword -n prod
+kubectl get secret -n prod
+kubectl delete secret mysecret -n prod
+# after deletion go and validate if the event is being logged under the logs directory
+cat /var/lib/rancher/k3s/server/logs/audit.log
 ```
 
