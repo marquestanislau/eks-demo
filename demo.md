@@ -28,10 +28,25 @@ password123,user4,u0004
 password123,user5,u0005
 ```
 
-Static token file
+Static basic file
 ```yaml 
 kube-apiserver-arg:
   - 'basic-auth-file=path/to/the/file/user-details.csv'
+```
+
+Static Token file
+```bash 
+# Create a csv file called user-detail.csv
+# password,username,userid
+password123,user1,u0001
+password123,user2,u0002
+password123,user3,u0003
+password123,user4,u0004
+password123,user5,u0005
+```
+```yaml 
+kube-apiserver-arg:
+  - 'token-auth-file=path/to/the/file/user-token-details.csv'
 ```
 
 ```bash
@@ -39,6 +54,8 @@ kube-apiserver-arg:
 
 sudo systemctl daemon-reload
 sudo systemctl restart k3s.service
+
+curl -v -k https://master-node-ip:6443/api/v1/pods -u "user1:password123"
 ```
 
 # System Hardening
